@@ -1001,6 +1001,7 @@
         [
           {
             "node": "Prepare Payment Instructions",
+            "node": "Send Payment Info",
             "type": "main",
             "index": 0
           }
@@ -1034,6 +1035,7 @@
         [
           {
             "node": "Fetch Full Ticket Data",
+            "node": "Confirm Payment to Customer",
             "type": "main",
             "index": 0
           }
@@ -1042,12 +1044,22 @@
     },
     "Confirm Payment to Customer": {
       "main": []
+      "main": [
+        [
+          {
+            "node": "Fetch Full Ticket Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Fetch Full Ticket Data": {
       "main": [
         [
           {
             "node": "Extract Payment Expectations",
+            "node": "Compile All Order Data",
             "type": "main",
             "index": 0
           }
