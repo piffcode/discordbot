@@ -10,7 +10,10 @@
       "name": "Discord Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 400],
+      "position": [
+        250,
+        400
+      ],
       "notes": "Receives all Discord events"
     },
     {
@@ -29,7 +32,10 @@
       "name": "Filter Ticket Channels",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [450, 400]
+      "position": [
+        450,
+        400
+      ]
     },
     {
       "parameters": {
@@ -39,7 +45,10 @@
       "name": "Parse Ticket Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [650, 500],
+      "position": [
+        650,
+        500
+      ],
       "notes": "Extracts order details including delivery notes"
     },
     {
@@ -52,7 +61,7 @@
           "parameters": [
             {
               "name": "content",
-              "value": "=✅ Thank you <@{{$json.customerId}}>! Processing your order...\n\n📋 **Order Details:**\nType: {{$json.orderType}}\nQuantity: {{$json.quantity}}\n{{$json.hasDeliveryNotes ? 'Delivery Notes: ' + $json.deliveryNotes : ''}}\n\nFetching account and pricing..."
+              "value": "=\u2705 Thank you <@{{$json.customerId}}>! Processing your order...\n\n\ud83d\udccb **Order Details:**\nType: {{$json.orderType}}\nQuantity: {{$json.quantity}}\n{{$json.hasDeliveryNotes ? 'Delivery Notes: ' + $json.deliveryNotes : ''}}\n\nFetching account and pricing..."
             }
           ]
         },
@@ -62,7 +71,10 @@
       "name": "Confirm Ticket Received",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [850, 500],
+      "position": [
+        850,
+        500
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -90,7 +102,10 @@
       "name": "Execute /getaccount",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1050, 500],
+      "position": [
+        1050,
+        500
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -107,7 +122,10 @@
       "name": "Wait for Account",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1250, 500]
+      "position": [
+        1250,
+        500
+      ]
     },
     {
       "parameters": {
@@ -120,7 +138,10 @@
       "name": "Fetch Account Response",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1450, 500],
+      "position": [
+        1450,
+        500
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -136,7 +157,24 @@
       "name": "Parse Account Info",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1650, 500]
+      "position": [
+        1650,
+        500
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const orderType = ($input.item.json.orderType || 'standard').toLowerCase();\nconst quantity = Number($input.item.json.quantity || 1);\nconst ticketChannelId = $input.item.json.ticketChannelId;\nconst customerId = $input.item.json.customerId;\nconst timestamp = $input.item.json.timestamp || new Date().toISOString();\n\nconst priceCatalog = {\n  standard: 12.35,\n  express: 18.5,\n  premium: 24.99\n};\n\nconst unitPrice = priceCatalog[orderType] ?? priceCatalog.standard;\nconst paymentCurrency = 'USD';\nconst paymentTotal = Number((unitPrice * quantity).toFixed(2));\nconst invoiceSeed = `${ticketChannelId || 'ticket'}-${customerId || 'buyer'}-${timestamp}`.replace(/[^0-9A-Za-z-]/g, '');\nconst invoiceReference = `INV-${invoiceSeed}`.substring(0, 32).toUpperCase();\n\nreturn {\n  ...$input.item.json,\n  unitPrice,\n  paymentCurrency,\n  paymentTotal,\n  invoiceReference,\n  acceptedPaymentMethods: ['paypal', 'crypto', 'cashapp']\n};"
+      },
+      "id": "prepare-payment-instructions",
+      "name": "Prepare Payment Instructions",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1850,
+        500
+      ],
+      "notes": "Calculates pricing, currency, and invoice reference for payment instructions"
     },
     {
       "parameters": {
@@ -148,7 +186,7 @@
           "parameters": [
             {
               "name": "embeds",
-              "value": "=[{\"title\": \"💰 Order Summary\", \"color\": 3447003, \"fields\": [{\"name\": \"Product\", \"value\": \"{{$json.orderType}}\", \"inline\": true}, {\"name\": \"Quantity\", \"value\": \"{{$json.quantity}}\", \"inline\": true}, {\"name\": \"Account\", \"value\": \"{{$json.accountUsername}}\", \"inline\": false}, {\"name\": \"Payment Methods\", \"value\": \"💳 **Send payment to:**\\n• PayPal: `paypal@example.com`\\n• Crypto: `[BTC Address]`\\n• CashApp: `$YourTag`\\n\\n**Then type `sent` when complete**\", \"inline\": false}], \"footer\": {\"text\": \"Awaiting payment confirmation\"}}]"
+              "value": "=[{\"title\": \"\ud83d\udcb0 Order Summary\", \"color\": 3447003, \"fields\": [{\"name\": \"Product\", \"value\": \"{{$json.orderType}}\", \"inline\": true}, {\"name\": \"Quantity\", \"value\": \"{{$json.quantity}}\", \"inline\": true}, {\"name\": \"Account\", \"value\": \"{{$json.accountUsername}}\", \"inline\": false}, {\"name\": \"Amount Due\", \"value\": \"${{$json.paymentCurrency}} ${{$json.paymentTotal}}\\n( {{$json.quantity}} \u00d7 ${{$json.unitPrice}} )\", \"inline\": false}, {\"name\": \"Payment Reference\", \"value\": \"`{{$json.invoiceReference}}`\\nInclude this code in your payment memo\", \"inline\": false}, {\"name\": \"Payment Methods\", \"value\": \"\ud83d\udcb3 **Send payment to:**\\n\u2022 PayPal: `paypal@example.com` (use Friends & Family)\\n\u2022 Crypto: `[BTC Address]`\\n\u2022 CashApp: `$YourTag`\\n\\n\ud83d\udcdd **After paying reply here:**\\n`sent <method> <transactionId> {{$json.paymentTotal}} {{$json.invoiceReference}}`\\nExample: `sent paypal 7YX12345AB6789012 12.35 {{$json.invoiceReference}}`\", \"inline\": false}], \"footer\": {\"text\": \"Awaiting payment confirmation\"}}]"
             }
           ]
         },
@@ -158,7 +196,10 @@
       "name": "Send Payment Info",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1850, 500],
+      "position": [
+        1850,
+        500
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -175,7 +216,10 @@
       "name": "Payment Webhook",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 1,
-      "position": [250, 900],
+      "position": [
+        250,
+        900
+      ],
       "notes": "Listens for customer saying 'sent'"
     },
     {
@@ -194,17 +238,23 @@
       "name": "Filter 'sent' Message",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [450, 900]
+      "position": [
+        450,
+        900
+      ]
     },
     {
       "parameters": {
-        "jsCode": "const channelId = $input.item.json.body.channel_id;\nconst customerId = $input.item.json.body.author.id;\n\nreturn {\n  ticketChannelId: channelId,\n  customerId: customerId,\n  paymentConfirmedAt: new Date().toISOString()\n};"
+        "jsCode": "const body = $input.item.json.body;\nconst channelId = body.channel_id;\nconst customerId = body.author.id;\nconst content = (body.content || '').trim();\nconst parts = content.split(/\\s+/);\n\nlet paymentMethod = null;\nlet transactionId = null;\nlet claimedAmount = null;\nlet providedInvoiceReference = null;\n\nif (parts.length > 0 && parts[0].toLowerCase() === 'sent') {\n  paymentMethod = parts[1] ? parts[1].toLowerCase() : null;\n  transactionId = parts[2] || null;\n}\n\nconst amountMatch = content.match(/(\\d+(?:\\.\\d{1,2})?)/);\nif (amountMatch) {\n  claimedAmount = Number(amountMatch[1]);\n}\n\nconst referenceMatch = content.match(/inv-[0-9a-z-]+/i);\nif (referenceMatch) {\n  providedInvoiceReference = referenceMatch[0].toUpperCase();\n}\n\nreturn {\n  ticketChannelId: channelId,\n  customerId: customerId,\n  paymentConfirmedAt: new Date().toISOString(),\n  paymentMessageContent: content,\n  paymentMethod,\n  customerTransactionId: transactionId,\n  claimedAmount,\n  providedInvoiceReference\n};"
       },
       "id": "capture-payment",
       "name": "Capture Payment Confirmation",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [650, 1000]
+      "position": [
+        650,
+        1000
+      ]
     },
     {
       "parameters": {
@@ -216,7 +266,7 @@
           "parameters": [
             {
               "name": "content",
-              "value": "=✅ Payment received! Processing fulfillment..."
+              "value": "=\u2705 Payment confirmed! Received ${{$json.verifiedAmount}} {{$json.verifiedCurrency}} via {{$json.paymentMethod ? $json.paymentMethod.toUpperCase() : 'payment'}} (Txn: {{$json.resolvedTransactionId || 'N/A'}}). Processing fulfillment..."
             }
           ]
         },
@@ -226,7 +276,10 @@
       "name": "Confirm Payment to Customer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [850, 1000],
+      "position": [
+        850,
+        1000
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -245,7 +298,10 @@
       "name": "Fetch Full Ticket Data",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1050, 1000],
+      "position": [
+        1050,
+        1000
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -256,13 +312,137 @@
     },
     {
       "parameters": {
-        "jsCode": "const messages = $input.item.json;\nlet orderData = {\n  orderType: 'N/A',\n  quantity: 1,\n  accountUsername: 'N/A',\n  accountPassword: 'N/A',\n  customerEmail: 'N/A',\n  deliveryNotes: null,\n  address: 'N/A',\n  hasDeliveryNotes: false\n};\n\nfor (const msg of messages) {\n  const content = msg.content;\n  \n  const orderMatch = content.match(/(?:order|type)[:\\s]+([^\\n]+)/i);\n  if (orderMatch && orderData.orderType === 'N/A') orderData.orderType = orderMatch[1].trim();\n  \n  const qtyMatch = content.match(/quantity[:\\s]+(\\d+)/i);\n  if (qtyMatch) orderData.quantity = parseInt(qtyMatch[1]);\n  \n  const accountMatch = content.match(/(?:account|username)[:\\s]+([^\\n]+)/i);\n  if (accountMatch && orderData.accountUsername === 'N/A') orderData.accountUsername = accountMatch[1].trim();\n  \n  const passwordMatch = content.match(/password[:\\s]+([^\\n]+)/i);\n  if (passwordMatch && orderData.accountPassword === 'N/A') orderData.accountPassword = passwordMatch[1].trim();\n  \n  const emailMatch = content.match(/email[:\\s]+([^\\s@]+@[^\\s@]+\\.[^\\s@]+)/i);\n  if (emailMatch && orderData.customerEmail === 'N/A') orderData.customerEmail = emailMatch[1];\n  \n  const notesMatch = content.match(/(?:delivery\\s*notes?|notes?)[:\\s]+([^\\n]+)/i);\n  if (notesMatch) {\n    orderData.deliveryNotes = notesMatch[1].trim();\n    orderData.hasDeliveryNotes = true;\n  }\n  \n  const addressMatch = content.match(/address[:\\s]+([^\\n]+)/i);\n  if (addressMatch && orderData.address === 'N/A') orderData.address = addressMatch[1].trim();\n}\n\nreturn {\n  ...$input.item.json,\n  ...orderData\n};"
+        "jsCode": "const messages = Array.isArray($input.item.json) ? $input.item.json : [];\nlet expectedAmount = null;\nlet expectedCurrency = 'USD';\nlet invoiceReference = null;\nlet paymentMethods = [];\n\nfor (const message of messages) {\n  if (!message?.author?.bot) continue;\n  if (!Array.isArray(message.embeds)) continue;\n  for (const embed of message.embeds) {\n    if (!Array.isArray(embed.fields)) continue;\n    for (const field of embed.fields) {\n      const name = (field.name || '').toLowerCase();\n      const value = field.value || '';\n\n      if (name.includes('amount due')) {\n        const amountMatch = value.match(/([0-9]+(?:\\.[0-9]{1,2})?)/);\n        if (amountMatch) {\n          expectedAmount = Number(amountMatch[1]);\n        }\n        const currencyMatch = value.match(/([A-Z]{3})/);\n        if (currencyMatch) {\n          expectedCurrency = currencyMatch[1];\n        }\n      }\n\n      if (name.includes('payment reference')) {\n        const refMatch = value.match(/`([^`]+)`/);\n        if (refMatch) {\n          invoiceReference = refMatch[1];\n        } else {\n          const plainMatch = value.match(/inv-[0-9a-z-]+/i);\n          if (plainMatch) {\n            invoiceReference = plainMatch[0];\n          }\n        }\n      }\n\n      if (name.includes('payment methods')) {\n        paymentMethods = value\n          .split(/\\n+/)\n          .map(line => line.replace(/^[\u2022-]\\s*/, '').trim())\n          .filter(Boolean);\n      }\n    }\n  }\n}\n\nreturn {\n  messages,\n  expectedAmount,\n  expectedCurrency,\n  invoiceReference,\n  paymentMethods\n};"
+      },
+      "id": "extract-payment-expectations",
+      "name": "Extract Payment Expectations",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        1000
+      ],
+      "notes": "Parses ticket history to recover invoice reference and expected amount"
+    },
+    {
+      "parameters": {
+        "jsCode": "const request = $('Capture Payment Confirmation').item.json;\nconst expectations = $input.item.json;\n\nreturn {\n  ...expectations,\n  verificationRequest: {\n    ticketChannelId: request.ticketChannelId,\n    customerId: request.customerId,\n    paymentMethod: request.paymentMethod,\n    customerTransactionId: request.customerTransactionId,\n    claimedAmount: request.claimedAmount,\n    providedInvoiceReference: request.providedInvoiceReference,\n    paymentMessageContent: request.paymentMessageContent,\n    expectedAmount: expectations.expectedAmount,\n    expectedCurrency: expectations.expectedCurrency,\n    invoiceReference: expectations.invoiceReference\n  }\n};"
+      },
+      "id": "build-verification-payload",
+      "name": "Build Verification Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1450,
+        1000
+      ],
+      "notes": "Combines customer claim with expected invoice details"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "https://finance.example.com/api/payments/verify",
+        "sendBody": true,
+        "jsonParameters": true,
+        "bodyParametersJson": "={{$json.verificationRequest}}",
+        "options": {}
+      },
+      "id": "verify-payment",
+      "name": "Verify Payment",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        1650,
+        1000
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "finance-api",
+          "name": "Finance API"
+        }
+      },
+      "notes": "Calls finance service to confirm funds received"
+    },
+    {
+      "parameters": {
+        "jsCode": "const verificationResponse = $input.item.json;\nconst context = $('Build Verification Payload').item.json;\nconst request = $('Capture Payment Confirmation').item.json;\n\nconst verifiedFlag = verificationResponse.verified === true;\nconst verifiedAmount = Number(verificationResponse.amount?.value ?? verificationResponse.amount ?? context.expectedAmount ?? 0);\nconst verifiedCurrency = verificationResponse.amount?.currency ?? context.expectedCurrency ?? 'USD';\nconst resolvedReference = verificationResponse.invoiceReference || context.invoiceReference || request.providedInvoiceReference || null;\nconst resolvedTransactionId = verificationResponse.transactionId || request.customerTransactionId || null;\n\nreturn {\n  ...context,\n  verificationResponse,\n  verified: verifiedFlag,\n  verifiedAmount,\n  verifiedCurrency,\n  resolvedReference,\n  resolvedTransactionId,\n  paymentMethod: request.paymentMethod || verificationResponse.paymentMethod || null,\n  ticketChannelId: request.ticketChannelId,\n  customerId: request.customerId,\n  paymentConfirmedAt: request.paymentConfirmedAt\n};"
+      },
+      "id": "combine-verification-result",
+      "name": "Combine Verification Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1850,
+        1000
+      ],
+      "notes": "Merges verification API response with workflow context"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.verified}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "payment-verified?",
+      "name": "Payment Verified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        2050,
+        1000
+      ],
+      "notes": "Routes flow only if payment was confirmed"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$('Capture Payment Confirmation').item.json.ticketChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=\u26a0\ufe0f We couldn't verify a payment matching invoice {{$json.invoiceReference || $('Capture Payment Confirmation').item.json.providedInvoiceReference || 'UNKNOWN'}}. Please double-check that ${{$json.expectedCurrency || 'USD'}} ${{$json.expectedAmount || 'the quoted total'}} was sent via the correct method and reply with `sent <method> <transactionId> {{$json.expectedAmount || ''}} {{$json.invoiceReference || ''}}`."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notify-verification-failure",
+      "name": "Notify Verification Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [
+        2250,
+        900
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Alerts the ticket if payment cannot be verified"
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.item.json;\nconst messages = Array.isArray(payload.messages) ? payload.messages : (Array.isArray(payload) ? payload : []);\nlet orderData = {\n  orderType: 'N/A',\n  quantity: 1,\n  accountUsername: 'N/A',\n  accountPassword: 'N/A',\n  customerEmail: 'N/A',\n  deliveryNotes: null,\n  address: 'N/A',\n  hasDeliveryNotes: false\n};\n\nfor (const msg of messages) {\n  const content = msg.content || '';\n  \n  const orderMatch = content.match(/(?:order|type)[:\\s]+([^\\n]+)/i);\n  if (orderMatch && orderData.orderType === 'N/A') orderData.orderType = orderMatch[1].trim();\n  \n  const qtyMatch = content.match(/quantity[:\\s]+(\\d+)/i);\n  if (qtyMatch) orderData.quantity = parseInt(qtyMatch[1], 10);\n  \n  const accountMatch = content.match(/(?:account|username)[:\\s]+([^\\n]+)/i);\n  if (accountMatch && orderData.accountUsername === 'N/A') orderData.accountUsername = accountMatch[1].trim();\n  \n  const passwordMatch = content.match(/password[:\\s]+([^\\n]+)/i);\n  if (passwordMatch && orderData.accountPassword === 'N/A') orderData.accountPassword = passwordMatch[1].trim();\n  \n  const emailMatch = content.match(/email[:\\s]+([^\\s@]+@[^\\s@]+\\.[^\\s@]+)/i);\n  if (emailMatch && orderData.customerEmail === 'N/A') orderData.customerEmail = emailMatch[1];\n  \n  const notesMatch = content.match(/(?:delivery\\s*notes?|notes?)[:\\s]+([^\\n]+)/i);\n  if (notesMatch) {\n    orderData.deliveryNotes = notesMatch[1].trim();\n    orderData.hasDeliveryNotes = true;\n  }\n  \n  const addressMatch = content.match(/address[:\\s]+([^\\n]+)/i);\n  if (addressMatch && orderData.address === 'N/A') orderData.address = addressMatch[1].trim();\n}\n\nreturn {\n  ...payload,\n  ...orderData\n};"
       },
       "id": "compile-order-data",
       "name": "Compile All Order Data",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1250, 1000],
+      "position": [
+        1250,
+        1000
+      ],
       "notes": "Extracts: order, qty, account, email, delivery notes, address"
     },
     {
@@ -285,7 +465,10 @@
       "name": "Create DM with Express Reborn Bot",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1450, 1000],
+      "position": [
+        1450,
+        1000
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -304,7 +487,7 @@
           "parameters": [
             {
               "name": "content",
-              "value": "=📦 Order: {{$('Compile All Order Data').item.json.orderType}}\\nQty: {{$('Compile All Order Data').item.json.quantity}}\\nAccount: {{$('Compile All Order Data').item.json.accountUsername}}\\nEmail: {{$('Compile All Order Data').item.json.customerEmail}}"
+              "value": "=\ud83d\udce6 Order: {{$('Compile All Order Data').item.json.orderType}}\\nQty: {{$('Compile All Order Data').item.json.quantity}}\\nAccount: {{$('Compile All Order Data').item.json.accountUsername}}\\nEmail: {{$('Compile All Order Data').item.json.customerEmail}}\\n\ud83d\udcb0 Payment: ${{$('Combine Verification Result').item.json.verifiedAmount}} {{$('Combine Verification Result').item.json.verifiedCurrency}} ({{$('Combine Verification Result').item.json.paymentMethod ? $('Combine Verification Result').item.json.paymentMethod.toUpperCase() : 'UNKNOWN'}})"
             }
           ]
         },
@@ -314,7 +497,10 @@
       "name": "Send Order to Bot",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [1650, 1000],
+      "position": [
+        1650,
+        1000
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -332,7 +518,10 @@
       "name": "Wait for Bot Buttons",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [1850, 1000]
+      "position": [
+        1850,
+        1000
+      ]
     },
     {
       "parameters": {
@@ -345,7 +534,10 @@
       "name": "Fetch Button Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2050, 1000],
+      "position": [
+        2050,
+        1000
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -362,7 +554,10 @@
       "name": "Parse Button IDs",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2250, 1000],
+      "position": [
+        2250,
+        1000
+      ],
       "notes": "Extracts custom_ids for: Change Delivery Note, Address Jog, Checkout"
     },
     {
@@ -380,7 +575,10 @@
       "name": "Has Delivery Notes?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [2450, 1000],
+      "position": [
+        2450,
+        1000
+      ],
       "notes": "Conditional: only click Change Delivery Note if customer provided notes"
     },
     {
@@ -436,7 +634,10 @@
       "name": "Click 'Change Delivery Note'",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2650, 900],
+      "position": [
+        2650,
+        900
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -454,7 +655,10 @@
       "name": "Wait After Delivery Note Click",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [2850, 900]
+      "position": [
+        2850,
+        900
+      ]
     },
     {
       "parameters": {
@@ -476,7 +680,10 @@
       "name": "Send Delivery Notes",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3050, 900],
+      "position": [
+        3050,
+        900
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -494,7 +701,10 @@
       "name": "Wait After Sending Notes",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [3250, 900]
+      "position": [
+        3250,
+        900
+      ]
     },
     {
       "parameters": {
@@ -541,7 +751,10 @@
       "name": "Click 'Address Jog'",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [2650, 1100],
+      "position": [
+        2650,
+        1100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -559,7 +772,10 @@
       "name": "Wait 5 Seconds",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [2850, 1100],
+      "position": [
+        2850,
+        1100
+      ],
       "notes": "Waits exactly 5 seconds as requested"
     },
     {
@@ -607,7 +823,10 @@
       "name": "Click 'Checkout'",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3050, 1100],
+      "position": [
+        3050,
+        1100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -625,7 +844,10 @@
       "name": "Wait for Product Link",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1,
-      "position": [3250, 1100]
+      "position": [
+        3250,
+        1100
+      ]
     },
     {
       "parameters": {
@@ -638,7 +860,10 @@
       "name": "Fetch Product Link Response",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3450, 1100],
+      "position": [
+        3450,
+        1100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -655,7 +880,10 @@
       "name": "Parse Product Link",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [3650, 1100]
+      "position": [
+        3650,
+        1100
+      ]
     },
     {
       "parameters": {
@@ -667,7 +895,7 @@
           "parameters": [
             {
               "name": "embeds",
-              "value": "=[{\"title\": \"🎉 Order Complete!\", \"description\": \"Your order has been fulfilled successfully!\", \"color\": 5763719, \"fields\": [{\"name\": \"📦 Product Link\", \"value\": \"[Click here to access your order]({{$json.productLink}})\", \"inline\": false}, {\"name\": \"Order Details\", \"value\": \"**Type:** {{$('Compile All Order Data').item.json.orderType}}\\n**Quantity:** {{$('Compile All Order Data').item.json.quantity}}\\n**Account:** {{$('Compile All Order Data').item.json.accountUsername}}\", \"inline\": false}], \"footer\": {\"text\": \"Thank you for your purchase!\"}, \"timestamp\": \"{{$json.timestamp}}\"}]"
+              "value": "=[{\"title\": \"\ud83c\udf89 Order Complete!\", \"description\": \"Your order has been fulfilled successfully!\", \"color\": 5763719, \"fields\": [{\"name\": \"\ud83d\udce6 Product Link\", \"value\": \"[Click here to access your order]({{$json.productLink}})\", \"inline\": false}, {\"name\": \"Order Details\", \"value\": \"**Type:** {{$('Compile All Order Data').item.json.orderType}}\\n**Quantity:** {{$('Compile All Order Data').item.json.quantity}}\\n**Account:** {{$('Compile All Order Data').item.json.accountUsername}}\", \"inline\": false}], \"footer\": {\"text\": \"Thank you for your purchase!\"}, \"timestamp\": \"{{$json.timestamp}}\"}]"
             }
           ]
         },
@@ -677,7 +905,10 @@
       "name": "Deliver Link to Customer",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4,
-      "position": [3850, 1100],
+      "position": [
+        3850,
+        1100
+      ],
       "credentials": {
         "httpHeaderAuth": {
           "id": "discord-bot-token",
@@ -769,6 +1000,7 @@
       "main": [
         [
           {
+            "node": "Prepare Payment Instructions",
             "node": "Send Payment Info",
             "type": "main",
             "index": 0
@@ -802,6 +1034,7 @@
       "main": [
         [
           {
+            "node": "Fetch Full Ticket Data",
             "node": "Confirm Payment to Customer",
             "type": "main",
             "index": 0
@@ -810,6 +1043,7 @@
       ]
     },
     "Confirm Payment to Customer": {
+      "main": []
       "main": [
         [
           {
@@ -824,6 +1058,7 @@
       "main": [
         [
           {
+            "node": "Extract Payment Expectations",
             "node": "Compile All Order Data",
             "type": "main",
             "index": 0
@@ -1019,6 +1254,84 @@
         [
           {
             "node": "Deliver Link to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Payment Instructions": {
+      "main": [
+        [
+          {
+            "node": "Send Payment Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Payment Expectations": {
+      "main": [
+        [
+          {
+            "node": "Build Verification Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Verification Payload": {
+      "main": [
+        [
+          {
+            "node": "Verify Payment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verify Payment": {
+      "main": [
+        [
+          {
+            "node": "Combine Verification Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Combine Verification Result": {
+      "main": [
+        [
+          {
+            "node": "Payment Verified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Verified?": {
+      "main": [
+        [
+          {
+            "node": "Confirm Payment to Customer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Compile All Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Notify Verification Failure",
             "type": "main",
             "index": 0
           }
