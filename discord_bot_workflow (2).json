@@ -686,3 +686,344 @@
       },
       "notes": "Sends beautiful embed with product link to customer in ticket"
     }
+  ],
+  "connections": {
+    "Discord Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter Ticket Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Ticket Channels": {
+      "main": [
+        [
+          {
+            "node": "Parse Ticket Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Ticket Info": {
+      "main": [
+        [
+          {
+            "node": "Confirm Ticket Received",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Ticket Received": {
+      "main": [
+        [
+          {
+            "node": "Execute /getaccount",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute /getaccount": {
+      "main": [
+        [
+          {
+            "node": "Wait for Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Account": {
+      "main": [
+        [
+          {
+            "node": "Fetch Account Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Account Response": {
+      "main": [
+        [
+          {
+            "node": "Parse Account Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Account Info": {
+      "main": [
+        [
+          {
+            "node": "Send Payment Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Payment Webhook": {
+      "main": [
+        [
+          {
+            "node": "Filter 'sent' Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter 'sent' Message": {
+      "main": [
+        [
+          {
+            "node": "Capture Payment Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Capture Payment Confirmation": {
+      "main": [
+        [
+          {
+            "node": "Confirm Payment to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirm Payment to Customer": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full Ticket Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Ticket Data": {
+      "main": [
+        [
+          {
+            "node": "Compile All Order Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Compile All Order Data": {
+      "main": [
+        [
+          {
+            "node": "Create DM with Express Reborn Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create DM with Express Reborn Bot": {
+      "main": [
+        [
+          {
+            "node": "Send Order to Bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Order to Bot": {
+      "main": [
+        [
+          {
+            "node": "Wait for Bot Buttons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Bot Buttons": {
+      "main": [
+        [
+          {
+            "node": "Fetch Button Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Button Message": {
+      "main": [
+        [
+          {
+            "node": "Parse Button IDs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Button IDs": {
+      "main": [
+        [
+          {
+            "node": "Has Delivery Notes?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Delivery Notes?": {
+      "main": [
+        [
+          {
+            "node": "Click 'Address Jog'",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Click 'Change Delivery Note'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Click 'Change Delivery Note'": {
+      "main": [
+        [
+          {
+            "node": "Wait After Delivery Note Click",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait After Delivery Note Click": {
+      "main": [
+        [
+          {
+            "node": "Send Delivery Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Delivery Notes": {
+      "main": [
+        [
+          {
+            "node": "Wait After Sending Notes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait After Sending Notes": {
+      "main": [
+        [
+          {
+            "node": "Click 'Address Jog'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Click 'Address Jog'": {
+      "main": [
+        [
+          {
+            "node": "Wait 5 Seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 5 Seconds": {
+      "main": [
+        [
+          {
+            "node": "Click 'Checkout'",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Click 'Checkout'": {
+      "main": [
+        [
+          {
+            "node": "Wait for Product Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait for Product Link": {
+      "main": [
+        [
+          {
+            "node": "Fetch Product Link Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Product Link Response": {
+      "main": [
+        [
+          {
+            "node": "Parse Product Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Product Link": {
+      "main": [
+        [
+          {
+            "node": "Deliver Link to Customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
