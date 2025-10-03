@@ -1,0 +1,688 @@
+{
+  "name": "Discord Sales Bot - Express Reborn Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "discord-webhook",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Discord Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 400],
+      "notes": "Receives all Discord events"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.body.channel_name}}",
+              "operation": "contains",
+              "value2": "ticket"
+            }
+          ]
+        }
+      },
+      "id": "filter-ticket-channel",
+      "name": "Filter Ticket Channels",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const content = $input.item.json.body.content || '';\nconst channelId = $input.item.json.body.channel_id;\nconst customerId = $input.item.json.body.author.id;\nconst customerUsername = $input.item.json.body.author.username;\n\n// Parse order details\nconst orderTypeMatch = content.match(/order[:\\s]+([^\\n]+)/i);\nconst quantityMatch = content.match(/quantity[:\\s]+(\\d+)/i);\nconst emailMatch = content.match(/email[:\\s]+([^\\s@]+@[^\\s@]+\\.[^\\s@]+)/i);\nconst deliveryNotesMatch = content.match(/(?:delivery\\s*notes?|notes?)[:\\s]+([^\\n]+)/i);\nconst addressMatch = content.match(/address[:\\s]+([^\\n]+)/i);\n\nreturn {\n  ticketChannelId: channelId,\n  customerId: customerId,\n  customerUsername: customerUsername,\n  orderType: orderTypeMatch ? orderTypeMatch[1].trim() : 'standard',\n  quantity: quantityMatch ? parseInt(quantityMatch[1]) : 1,\n  customerEmail: emailMatch ? emailMatch[1] : 'N/A',\n  deliveryNotes: deliveryNotesMatch ? deliveryNotesMatch[1].trim() : null,\n  address: addressMatch ? addressMatch[1].trim() : 'N/A',\n  hasDeliveryNotes: !!deliveryNotesMatch,\n  rawContent: content,\n  timestamp: new Date().toISOString(),\n  status: 'pending'\n};"
+      },
+      "id": "parse-ticket-info",
+      "name": "Parse Ticket Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 500],
+      "notes": "Extracts order details including delivery notes"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$json.ticketChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=✅ Thank you <@{{$json.customerId}}>! Processing your order...\n\n📋 **Order Details:**\nType: {{$json.orderType}}\nQuantity: {{$json.quantity}}\n{{$json.hasDeliveryNotes ? 'Delivery Notes: ' + $json.deliveryNotes : ''}}\n\nFetching account and pricing..."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "confirm-ticket-received",
+      "name": "Confirm Ticket Received",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$json.ticketChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=/getaccount {{$json.orderType}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "execute-getaccount",
+      "name": "Execute /getaccount",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-for-account",
+      "name": "Wait for Account",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1250, 500]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "GET",
+        "url": "=https://discord.com/api/v10/channels/{{$json.ticketChannelId}}/messages?limit=5",
+        "options": {}
+      },
+      "id": "fetch-account-response",
+      "name": "Fetch Account Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = $input.item.json;\nlet accountInfo = null;\n\nfor (const msg of messages) {\n  if (msg.author.bot && (msg.content.includes('account') || msg.content.includes('username'))) {\n    accountInfo = msg.content;\n    break;\n  }\n}\n\nconst accountMatch = accountInfo ? accountInfo.match(/(?:account|username)[:\\s]+([^\\n]+)/i) : null;\nconst passwordMatch = accountInfo ? accountInfo.match(/password[:\\s]+([^\\n]+)/i) : null;\n\nreturn {\n  ...$input.item.json,\n  accountUsername: accountMatch ? accountMatch[1].trim() : 'N/A',\n  accountPassword: passwordMatch ? passwordMatch[1].trim() : 'N/A',\n  hasAccount: !!accountInfo\n};"
+      },
+      "id": "parse-account-info",
+      "name": "Parse Account Info",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 500]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$json.ticketChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "embeds",
+              "value": "=[{\"title\": \"💰 Order Summary\", \"color\": 3447003, \"fields\": [{\"name\": \"Product\", \"value\": \"{{$json.orderType}}\", \"inline\": true}, {\"name\": \"Quantity\", \"value\": \"{{$json.quantity}}\", \"inline\": true}, {\"name\": \"Account\", \"value\": \"{{$json.accountUsername}}\", \"inline\": false}, {\"name\": \"Payment Methods\", \"value\": \"💳 **Send payment to:**\\n• PayPal: `paypal@example.com`\\n• Crypto: `[BTC Address]`\\n• CashApp: `$YourTag`\\n\\n**Then type `sent` when complete**\", \"inline\": false}], \"footer\": {\"text\": \"Awaiting payment confirmation\"}}]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-payment-info",
+      "name": "Send Payment Info",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1850, 500],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "path": "payment-webhook",
+        "options": {}
+      },
+      "id": "payment-webhook",
+      "name": "Payment Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [250, 900],
+      "notes": "Listens for customer saying 'sent'"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json.body.content.toLowerCase()}}",
+              "operation": "contains",
+              "value2": "sent"
+            }
+          ]
+        }
+      },
+      "id": "filter-sent",
+      "name": "Filter 'sent' Message",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [450, 900]
+    },
+    {
+      "parameters": {
+        "jsCode": "const channelId = $input.item.json.body.channel_id;\nconst customerId = $input.item.json.body.author.id;\n\nreturn {\n  ticketChannelId: channelId,\n  customerId: customerId,\n  paymentConfirmedAt: new Date().toISOString()\n};"
+      },
+      "id": "capture-payment",
+      "name": "Capture Payment Confirmation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 1000]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$json.ticketChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=✅ Payment received! Processing fulfillment..."
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "confirm-payment",
+      "name": "Confirm Payment to Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [850, 1000],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "GET",
+        "url": "=https://discord.com/api/v10/channels/{{$json.ticketChannelId}}/messages?limit=30",
+        "options": {}
+      },
+      "id": "fetch-ticket-data",
+      "name": "Fetch Full Ticket Data",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1050, 1000],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Gets all order details from ticket history"
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = $input.item.json;\nlet orderData = {\n  orderType: 'N/A',\n  quantity: 1,\n  accountUsername: 'N/A',\n  accountPassword: 'N/A',\n  customerEmail: 'N/A',\n  deliveryNotes: null,\n  address: 'N/A',\n  hasDeliveryNotes: false\n};\n\nfor (const msg of messages) {\n  const content = msg.content;\n  \n  const orderMatch = content.match(/(?:order|type)[:\\s]+([^\\n]+)/i);\n  if (orderMatch && orderData.orderType === 'N/A') orderData.orderType = orderMatch[1].trim();\n  \n  const qtyMatch = content.match(/quantity[:\\s]+(\\d+)/i);\n  if (qtyMatch) orderData.quantity = parseInt(qtyMatch[1]);\n  \n  const accountMatch = content.match(/(?:account|username)[:\\s]+([^\\n]+)/i);\n  if (accountMatch && orderData.accountUsername === 'N/A') orderData.accountUsername = accountMatch[1].trim();\n  \n  const passwordMatch = content.match(/password[:\\s]+([^\\n]+)/i);\n  if (passwordMatch && orderData.accountPassword === 'N/A') orderData.accountPassword = passwordMatch[1].trim();\n  \n  const emailMatch = content.match(/email[:\\s]+([^\\s@]+@[^\\s@]+\\.[^\\s@]+)/i);\n  if (emailMatch && orderData.customerEmail === 'N/A') orderData.customerEmail = emailMatch[1];\n  \n  const notesMatch = content.match(/(?:delivery\\s*notes?|notes?)[:\\s]+([^\\n]+)/i);\n  if (notesMatch) {\n    orderData.deliveryNotes = notesMatch[1].trim();\n    orderData.hasDeliveryNotes = true;\n  }\n  \n  const addressMatch = content.match(/address[:\\s]+([^\\n]+)/i);\n  if (addressMatch && orderData.address === 'N/A') orderData.address = addressMatch[1].trim();\n}\n\nreturn {\n  ...$input.item.json,\n  ...orderData\n};"
+      },
+      "id": "compile-order-data",
+      "name": "Compile All Order Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1250, 1000],
+      "notes": "Extracts: order, qty, account, email, delivery notes, address"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "https://discord.com/api/v10/users/@me/channels",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "recipient_id",
+              "value": "FULFILLMENT_BOT_USER_ID"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "create-dm-bot",
+      "name": "Create DM with Express Reborn Bot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1450, 1000],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Opens DM channel with fulfillment bot"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$json.id}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "=📦 Order: {{$('Compile All Order Data').item.json.orderType}}\\nQty: {{$('Compile All Order Data').item.json.quantity}}\\nAccount: {{$('Compile All Order Data').item.json.accountUsername}}\\nEmail: {{$('Compile All Order Data').item.json.customerEmail}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-order-to-bot",
+      "name": "Send Order to Bot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1650, 1000],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Sends order info - bot will respond with buttons"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "seconds"
+      },
+      "id": "wait-for-buttons",
+      "name": "Wait for Bot Buttons",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [1850, 1000]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "GET",
+        "url": "=https://discord.com/api/v10/channels/{{$('Create DM with Express Reborn Bot').item.json.id}}/messages?limit=2",
+        "options": {}
+      },
+      "id": "fetch-button-message",
+      "name": "Fetch Button Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2050, 1000],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Gets the message with all the buttons"
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = $input.item.json;\nlet buttonMessage = null;\nlet buttons = [];\n\nfor (const msg of messages) {\n  if (msg.components && msg.components.length > 0) {\n    buttonMessage = msg;\n    \n    for (const row of msg.components) {\n      if (row.components) {\n        for (const button of row.components) {\n          buttons.push({\n            label: button.label,\n            custom_id: button.custom_id,\n            style: button.style\n          });\n        }\n      }\n    }\n    break;\n  }\n}\n\nconst hasDeliveryNotes = $('Compile All Order Data').item.json.hasDeliveryNotes;\nconst deliveryNotes = $('Compile All Order Data').item.json.deliveryNotes;\n\n// Find button custom_ids\nlet changeDeliveryNoteButton = buttons.find(b => b.label && b.label.toLowerCase().includes('delivery note'));\nlet addressJogButton = buttons.find(b => b.label && (b.label.toLowerCase().includes('address jog') || b.label === 'Address Jog'));\nlet checkoutButton = buttons.find(b => b.label && b.label.toLowerCase().includes('checkout'));\n\nreturn {\n  ...$input.item.json,\n  buttonMessageId: buttonMessage?.id,\n  dmChannelId: $('Create DM with Express Reborn Bot').item.json.id,\n  hasDeliveryNotes: hasDeliveryNotes,\n  deliveryNotes: deliveryNotes,\n  changeDeliveryNoteButtonId: changeDeliveryNoteButton?.custom_id,\n  addressJogButtonId: addressJogButton?.custom_id,\n  checkoutButtonId: checkoutButton?.custom_id,\n  allButtons: buttons\n};"
+      },
+      "id": "parse-buttons",
+      "name": "Parse Button IDs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2250, 1000],
+      "notes": "Extracts custom_ids for: Change Delivery Note, Address Jog, Checkout"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{$json.hasDeliveryNotes}}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "check-delivery-notes",
+      "name": "Has Delivery Notes?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [2450, 1000],
+      "notes": "Conditional: only click Change Delivery Note if customer provided notes"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/interactions",
+        "sendBody": true,
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "3"
+            },
+            {
+              "name": "guild_id",
+              "value": "null"
+            },
+            {
+              "name": "channel_id",
+              "value": "={{$json.dmChannelId}}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{$json.buttonMessageId}}"
+            },
+            {
+              "name": "application_id",
+              "value": "YOUR_BOT_APPLICATION_ID"
+            },
+            {
+              "name": "session_id",
+              "value": "n8n_automation"
+            },
+            {
+              "name": "data",
+              "value": "={\"component_type\": 2, \"custom_id\": \"{{$json.changeDeliveryNoteButtonId}}\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "click-change-delivery-note",
+      "name": "Click 'Change Delivery Note'",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2650, 900],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Programmatically clicks the Change Delivery Note button"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-after-delivery-click",
+      "name": "Wait After Delivery Note Click",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2850, 900]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$json.dmChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "content",
+              "value": "={{$json.deliveryNotes}}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-delivery-notes",
+      "name": "Send Delivery Notes",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3050, 900],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Types the delivery notes as text message"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "wait-after-notes",
+      "name": "Wait After Sending Notes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [3250, 900]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/interactions",
+        "sendBody": true,
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "3"
+            },
+            {
+              "name": "channel_id",
+              "value": "={{$('Parse Button IDs').item.json.dmChannelId}}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{$('Parse Button IDs').item.json.buttonMessageId}}"
+            },
+            {
+              "name": "application_id",
+              "value": "YOUR_BOT_APPLICATION_ID"
+            },
+            {
+              "name": "data",
+              "value": "={\"component_type\": 2, \"custom_id\": \"{{$('Parse Button IDs').item.json.addressJogButtonId}}\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "click-address-jog",
+      "name": "Click 'Address Jog'",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [2650, 1100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Clicks Address Jog button"
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-5-seconds",
+      "name": "Wait 5 Seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [2850, 1100],
+      "notes": "Waits exactly 5 seconds as requested"
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/interactions",
+        "sendBody": true,
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "type",
+              "value": "3"
+            },
+            {
+              "name": "channel_id",
+              "value": "={{$('Parse Button IDs').item.json.dmChannelId}}"
+            },
+            {
+              "name": "message_id",
+              "value": "={{$('Parse Button IDs').item.json.buttonMessageId}}"
+            },
+            {
+              "name": "application_id",
+              "value": "YOUR_BOT_APPLICATION_ID"
+            },
+            {
+              "name": "data",
+              "value": "={\"component_type\": 2, \"custom_id\": \"{{$('Parse Button IDs').item.json.checkoutButtonId}}\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "click-checkout",
+      "name": "Click 'Checkout'",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3050, 1100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Final step: clicks Checkout"
+    },
+    {
+      "parameters": {
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "id": "wait-for-link",
+      "name": "Wait for Product Link",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [3250, 1100]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "GET",
+        "url": "=https://discord.com/api/v10/channels/{{$('Parse Button IDs').item.json.dmChannelId}}/messages?limit=5",
+        "options": {}
+      },
+      "id": "fetch-final-response",
+      "name": "Fetch Product Link Response",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3450, 1100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Gets the bot's final message with product link"
+    },
+    {
+      "parameters": {
+        "jsCode": "const messages = $input.item.json;\nlet productLink = null;\nlet attachmentLink = null;\n\nfor (const msg of messages) {\n  // Check for URL in message content\n  const urlMatch = msg.content.match(/(https?:\\/\\/[^\\s]+)/i);\n  if (urlMatch) {\n    productLink = urlMatch[1];\n  }\n  \n  // Check for attachments\n  if (msg.attachments && msg.attachments.length > 0) {\n    attachmentLink = msg.attachments[0].url;\n  }\n  \n  if (productLink || attachmentLink) break;\n}\n\nconst finalLink = productLink || attachmentLink;\n\nreturn {\n  ...$input.item.json,\n  productLink: finalLink || 'No link found',\n  hasProductLink: !!finalLink,\n  rawResponse: messages[0]?.content || 'No response'\n};"
+      },
+      "id": "parse-product-link",
+      "name": "Parse Product Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3650, 1100]
+    },
+    {
+      "parameters": {
+        "authentication": "headerAuth",
+        "requestMethod": "POST",
+        "url": "=https://discord.com/api/v10/channels/{{$('Capture Payment Confirmation').item.json.ticketChannelId}}/messages",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "embeds",
+              "value": "=[{\"title\": \"🎉 Order Complete!\", \"description\": \"Your order has been fulfilled successfully!\", \"color\": 5763719, \"fields\": [{\"name\": \"📦 Product Link\", \"value\": \"[Click here to access your order]({{$json.productLink}})\", \"inline\": false}, {\"name\": \"Order Details\", \"value\": \"**Type:** {{$('Compile All Order Data').item.json.orderType}}\\n**Quantity:** {{$('Compile All Order Data').item.json.quantity}}\\n**Account:** {{$('Compile All Order Data').item.json.accountUsername}}\", \"inline\": false}], \"footer\": {\"text\": \"Thank you for your purchase!\"}, \"timestamp\": \"{{$json.timestamp}}\"}]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "deliver-to-customer",
+      "name": "Deliver Link to Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [3850, 1100],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "discord-bot-token",
+          "name": "Discord Bot Token"
+        }
+      },
+      "notes": "Sends beautiful embed with product link to customer in ticket"
+    }
