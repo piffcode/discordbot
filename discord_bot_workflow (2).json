@@ -164,7 +164,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const orderType = ($input.item.json.orderType || 'standard').toLowerCase();\nconst quantity = Number($input.item.json.quantity || 1);\nconst ticketChannelId = $input.item.json.ticketChannelId;\nconst customerId = $input.item.json.customerId;\nconst timestamp = $input.item.json.timestamp || new Date().toISOString();\n\nconst priceCatalog = {\n  standard: 12.35,\n  express: 18.5,\n  premium: 24.99\n};\n\nconst unitPrice = priceCatalog[orderType] ?? priceCatalog.standard;\nconst paymentCurrency = 'USD';\nconst paymentTotal = Number((unitPrice * quantity).toFixed(2));\nconst invoiceSeed = `${ticketChannelId || 'ticket'}-${customerId || 'buyer'}-${timestamp}`.replace(/[^0-9A-Za-z-]/g, '');\nconst invoiceReference = `INV-${invoiceSeed}`.substring(0, 32).toUpperCase();\n\nreturn {\n  ...$input.item.json,\n  unitPrice,\n  paymentCurrency,\n  paymentTotal,\n  invoiceReference,\n  acceptedPaymentMethods: ['paypal', 'crypto', 'cashapp']\n};"
+        "jsCode": "const orderType = ($input.item.json.orderType || 'standard').toLowerCase();\nconst quantity = Number($input.item.json.quantity || 1);\nconst ticketChannelId = $input.item.json.ticketChannelId;\nconst customerId = $input.item.json.customerId;\nconst timestamp = $input.item.json.timestamp || new Date().toISOString();\n\nconst priceCatalog = {\n  standard: 12.35,\n  express: 18.5,\n  premium: 24.99\n};\n\nconst unitPrice = priceCatalog[orderType] ?? priceCatalog.standard;\nconst paymentCurrency = 'USD';\nconst paymentTotal = Number((unitPrice * quantity).toFixed(2));\nconst invoiceSeed = `${ticketChannelId || 'ticket'}-${customerId || 'buyer'}-${timestamp}`.replace(/[^0-9A-Za-z-]/g, '');\nconst invoiceReference = `INV-${invoiceSeed}`.substring(0, 32).toUpperCase();\nconst acceptedPaymentMethods = ['paypal', 'venmo', 'cashapp', 'crypto'];\n\nreturn {\n  ...$input.item.json,\n  unitPrice,\n  paymentCurrency,\n  paymentTotal,\n  invoiceReference,\n  acceptedPaymentMethods\n};"
       },
       "id": "prepare-payment-instructions",
       "name": "Prepare Payment Instructions",
@@ -186,7 +186,7 @@
           "parameters": [
             {
               "name": "embeds",
-              "value": "=[{\"title\": \"\ud83d\udcb0 Order Summary\", \"color\": 3447003, \"fields\": [{\"name\": \"Product\", \"value\": \"{{$json.orderType}}\", \"inline\": true}, {\"name\": \"Quantity\", \"value\": \"{{$json.quantity}}\", \"inline\": true}, {\"name\": \"Account\", \"value\": \"{{$json.accountUsername}}\", \"inline\": false}, {\"name\": \"Amount Due\", \"value\": \"${{$json.paymentCurrency}} ${{$json.paymentTotal}}\\n( {{$json.quantity}} \u00d7 ${{$json.unitPrice}} )\", \"inline\": false}, {\"name\": \"Payment Reference\", \"value\": \"`{{$json.invoiceReference}}`\\nInclude this code in your payment memo\", \"inline\": false}, {\"name\": \"Payment Methods\", \"value\": \"\ud83d\udcb3 **Send payment to:**\\n\u2022 PayPal: `paypal@example.com` (use Friends & Family)\\n\u2022 Crypto: `[BTC Address]`\\n\u2022 CashApp: `$YourTag`\\n\\n\ud83d\udcdd **After paying reply here:**\\n`sent <method> <transactionId> {{$json.paymentTotal}} {{$json.invoiceReference}}`\\nExample: `sent paypal 7YX12345AB6789012 12.35 {{$json.invoiceReference}}`\", \"inline\": false}], \"footer\": {\"text\": \"Awaiting payment confirmation\"}}]"
+              "value": "=[{\"title\": \"\ud83d\udcb0 Order Summary\", \"color\": 3447003, \"fields\": [{\"name\": \"Product\", \"value\": \"{{$json.orderType}}\", \"inline\": true}, {\"name\": \"Quantity\", \"value\": \"{{$json.quantity}}\", \"inline\": true}, {\"name\": \"Account\", \"value\": \"{{$json.accountUsername}}\", \"inline\": false}, {\"name\": \"Amount Due\", \"value\": \"${{$json.paymentCurrency}} ${{$json.paymentTotal}}\\n( {{$json.quantity}} \u00d7 ${{$json.unitPrice}} )\", \"inline\": false}, {\"name\": \"Payment Reference\", \"value\": \"`{{$json.invoiceReference}}`\\nInclude this code in your payment memo\", \"inline\": false}, {\"name\": \"Payment Methods\", \"value\": \"\ud83d\udcb3 **Send payment to:**\\n\u2022 PayPal: `paypal@example.com` (use Friends & Family)\\n\u2022 Venmo: `@YourVenmo`\\n\u2022 CashApp: `$YourTag`\\n\u2022 Crypto: `[BTC Address]`\\n\\n\ud83d\udcdd **After paying reply here:**\\n`sent <method> <transactionId> {{$json.paymentTotal}} {{$json.invoiceReference}}`\\nUse \"paypal\", \"venmo\", or \"cashapp\" for <method>.\\nExample: `sent venmo 7YX12345AB6789012 12.35 {{$json.invoiceReference}}`\", \"inline\": false}], \"footer\": {\"text\": \"Awaiting payment confirmation\"}}]"
             }
           ]
         },
@@ -245,7 +245,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const body = $input.item.json.body;\nconst channelId = body.channel_id;\nconst customerId = body.author.id;\nconst content = (body.content || '').trim();\nconst parts = content.split(/\\s+/);\n\nlet paymentMethod = null;\nlet transactionId = null;\nlet claimedAmount = null;\nlet providedInvoiceReference = null;\n\nif (parts.length > 0 && parts[0].toLowerCase() === 'sent') {\n  paymentMethod = parts[1] ? parts[1].toLowerCase() : null;\n  transactionId = parts[2] || null;\n}\n\nconst amountMatch = content.match(/(\\d+(?:\\.\\d{1,2})?)/);\nif (amountMatch) {\n  claimedAmount = Number(amountMatch[1]);\n}\n\nconst referenceMatch = content.match(/inv-[0-9a-z-]+/i);\nif (referenceMatch) {\n  providedInvoiceReference = referenceMatch[0].toUpperCase();\n}\n\nreturn {\n  ticketChannelId: channelId,\n  customerId: customerId,\n  paymentConfirmedAt: new Date().toISOString(),\n  paymentMessageContent: content,\n  paymentMethod,\n  customerTransactionId: transactionId,\n  claimedAmount,\n  providedInvoiceReference\n};"
+        "jsCode": "const body = $input.item.json.body;\nconst channelId = body.channel_id;\nconst customerId = body.author.id;\nconst content = (body.content || '').trim();\nconst parts = content.split(/\\s+/);\n\nconst allowedPaymentMethods = ['paypal', 'venmo', 'cashapp', 'crypto'];\nconst methodAliases = {\n  paypal: ['paypal', 'pp', 'paypalff', 'paypalfnf'],\n  venmo: ['venmo'],\n  cashapp: ['cashapp', 'cash', 'cashappff', 'cashappfnf'],\n  crypto: ['crypto', 'btc', 'bitcoin', 'eth', 'ethereum']\n};\n\nconst normalizePaymentMethod = (input) => {\n  if (!input) return null;\n  const lowered = input.toLowerCase();\n  const compact = lowered.replace(/[^a-z0-9]/g, '');\n\n  for (const [canonical, variants] of Object.entries(methodAliases)) {\n    if (variants.includes(lowered) || variants.includes(compact)) {\n      return canonical;\n    }\n  }\n\n  if (allowedPaymentMethods.includes(compact)) {\n    return compact;\n  }\n  if (allowedPaymentMethods.includes(lowered)) {\n    return lowered;\n  }\n\n  return null;\n};\n\nlet paymentMethod = null;\nlet rawPaymentMethod = null;\nlet transactionId = null;\nlet claimedAmount = null;\nlet providedInvoiceReference = null;\n\nif (parts.length > 0 && parts[0].toLowerCase() === 'sent') {\n  rawPaymentMethod = parts[1] || null;\n  paymentMethod = normalizePaymentMethod(rawPaymentMethod);\n  transactionId = parts[2] || null;\n}\n\nconst amountMatch = content.match(/(\\d+(?:\\.\\d{1,2})?)/);\nif (amountMatch) {\n  claimedAmount = Number(amountMatch[1]);\n}\n\nconst referenceMatch = content.match(/inv-[0-9a-z-]+/i);\nif (referenceMatch) {\n  providedInvoiceReference = referenceMatch[0].toUpperCase();\n}\n\nreturn {\n  ticketChannelId: channelId,\n  customerId: customerId,\n  paymentConfirmedAt: new Date().toISOString(),\n  paymentMessageContent: content,\n  paymentMethod,\n  rawPaymentMethod,\n  customerTransactionId: transactionId,\n  claimedAmount,\n  providedInvoiceReference\n};"
       },
       "id": "capture-payment",
       "name": "Capture Payment Confirmation",
@@ -326,7 +326,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const request = $('Capture Payment Confirmation').item.json;\nconst expectations = $input.item.json;\n\nreturn {\n  ...expectations,\n  verificationRequest: {\n    ticketChannelId: request.ticketChannelId,\n    customerId: request.customerId,\n    paymentMethod: request.paymentMethod,\n    customerTransactionId: request.customerTransactionId,\n    claimedAmount: request.claimedAmount,\n    providedInvoiceReference: request.providedInvoiceReference,\n    paymentMessageContent: request.paymentMessageContent,\n    expectedAmount: expectations.expectedAmount,\n    expectedCurrency: expectations.expectedCurrency,\n    invoiceReference: expectations.invoiceReference\n  }\n};"
+        "jsCode": "const request = $('Capture Payment Confirmation').item.json;\nconst expectations = $input.item.json;\n\nconst defaultAcceptedMethods = ['paypal', 'venmo', 'cashapp'];\nconst expectedMethods = Array.isArray(expectations.paymentMethods) ? expectations.paymentMethods : [];\nconst canonicalMethods = Array.from(new Set(expectedMethods\n  .map(line => (line || '').toLowerCase())\n  .map(line => {\n    if (line.includes('paypal')) return 'paypal';\n    if (line.includes('venmo')) return 'venmo';\n    if (line.includes('cashapp') || line.includes('cash app')) return 'cashapp';\n    if (line.includes('crypto') || line.includes('bitcoin') || line.includes('btc') || line.includes('ethereum') || line.includes('eth')) return 'crypto';\n    return null;\n  })\n  .filter(Boolean)));\nconst acceptedPaymentMethods = canonicalMethods.length > 0 ? canonicalMethods : defaultAcceptedMethods;\n\nreturn {\n  ...expectations,\n  acceptedPaymentMethods,\n  verificationRequest: {\n    ticketChannelId: request.ticketChannelId,\n    customerId: request.customerId,\n    paymentMethod: request.paymentMethod,\n    rawPaymentMethod: request.rawPaymentMethod,\n    customerTransactionId: request.customerTransactionId,\n    claimedAmount: request.claimedAmount,\n    providedInvoiceReference: request.providedInvoiceReference,\n    paymentMessageContent: request.paymentMessageContent,\n    expectedAmount: expectations.expectedAmount,\n    expectedCurrency: expectations.expectedCurrency,\n    invoiceReference: expectations.invoiceReference,\n    acceptedPaymentMethods\n  }\n};"
       },
       "id": "build-verification-payload",
       "name": "Build Verification Payload",
@@ -409,7 +409,7 @@
           "parameters": [
             {
               "name": "content",
-              "value": "=\u26a0\ufe0f We couldn't verify a payment matching invoice {{$json.invoiceReference || $('Capture Payment Confirmation').item.json.providedInvoiceReference || 'UNKNOWN'}}. Please double-check that ${{$json.expectedCurrency || 'USD'}} ${{$json.expectedAmount || 'the quoted total'}} was sent via the correct method and reply with `sent <method> <transactionId> {{$json.expectedAmount || ''}} {{$json.invoiceReference || ''}}`."
+              "value": "=\u26a0\ufe0f We couldn't verify a payment matching invoice {{$json.invoiceReference || $('Capture Payment Confirmation').item.json.providedInvoiceReference || 'UNKNOWN'}}. Please double-check that ${{$json.expectedCurrency || 'USD'}} ${{$json.expectedAmount || 'the quoted total'}} was sent via the correct method and reply with `sent <method> <transactionId> {{$json.expectedAmount || ''}} {{$json.invoiceReference || ''}}` (use \"paypal\", \"venmo\", or \"cashapp\" for <method>)."
             }
           ]
         },
@@ -1001,6 +1001,10 @@
         [
           {
             "node": "Prepare Payment Instructions",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Send Payment Info",
             "type": "main",
             "index": 0
@@ -1034,18 +1038,10 @@
       "main": [
         [
           {
-            "node": "Fetch Full Ticket Data",
             "node": "Confirm Payment to Customer",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Confirm Payment to Customer": {
-      "main": []
-      "main": [
-        [
+          },
           {
             "node": "Fetch Full Ticket Data",
             "type": "main",
@@ -1059,6 +1055,10 @@
         [
           {
             "node": "Extract Payment Expectations",
+            "type": "main",
+            "index": 0
+          },
+          {
             "node": "Compile All Order Data",
             "type": "main",
             "index": 0
